@@ -31,13 +31,12 @@ def sendToServer():
             if face.label == "undefined":
                 print(face)
                 crop = face.crop_image(frame)
-                cv2.imwrite('1.jpg', crop)
                 ret,jpeg =cv2.imencode('.jpg', crop)
                 imgdata = jpeg.tobytes()
-                print('trying to send')
+                #print(imgdata)
                 response = requests.post(
                     url=f'http://{args.ip}:{args.port}',
-                    data = {'data': imgdata},
+                    data =  imgdata,
                     headers = {"Content-Type" :"image/jpeg"}
                 )
                 print(response.text)
@@ -135,6 +134,18 @@ if __name__ == '__main__':
         while True:
             frame = cv2.flip(frame, 1)
             bboxes = getBoxes(net, frame)
+            # if len(bboxes)>0:
+            #     b = Box(bboxes[0])
+            #     crop = b.crop_image(frame)
+            #     ret, jpeg = cv2.imencode('.jpg', crop)
+            #     imgdata = jpeg.tobytes()
+            #     print(imgdata)
+            #     response = requests.post(
+            #         url=f'http://{args.ip}:{args.port}',
+            #         data = "data".encode('utf-8'),
+            #         #headers = {"Content-Type" :"image/jpeg"}
+            #     )
+            #     cv2.imshow("crop", crop)
             faceBoxes = processBox(faceBoxes, bboxes)
             #print("faces", faceBoxes)
             drawBoxes(faceBoxes, frame)

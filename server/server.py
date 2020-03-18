@@ -24,13 +24,8 @@ class Handler(BaseHTTPRequestHandler):
                     return "Who are you?".encode('utf-8')
             return "".encode('utf-8')
         elif self.headers['Content-Type'] == "image/jpeg":
-            print('right place')
-            data_size = int(self.headers['Content-Length'])
-            print(data_size)
-            #data_bytes = self.rfile.read(data_size)
-            #im = Image.open(BytesIO(data_bytes))
-            #im.save('1.jpg')
-            print('save')
+            im = Image.open(BytesIO(data_bytes))
+            im.show()
             return "stasiv".encode('utf-8')
         else:
             return "unknown".encode('utf-8')
