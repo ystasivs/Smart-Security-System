@@ -5,6 +5,9 @@ import numpy as np
 import os
 import queue
 import time
+import requests
+
+
 
 exitFlag = 0
 DNN = 'TF'
@@ -55,7 +58,6 @@ def getBoxes(net , frame, conf_threshold=0.7):
             x2 = int(detections[0, 0, i, 5] * frameWidth)
             y2 = int(detections[0, 0, i, 6] * frameHeight)
             bboxes.append(Box(x1, y1, x2, y2))
-            #cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), int(round(frameHeight/150)), 8)
     return bboxes
 
 if __name__ == '__main__':
@@ -63,6 +65,8 @@ if __name__ == '__main__':
     parser.add_argument('--cam_id', type=int, default=0, help='Input stream ID.')
     parser.add_argument('--width', type=int, default=640, help='Input stream width.')
     parser.add_argument('--heigth', type=int, default=480, help='Input stream heigth.')
+    parser.add_argument('--ip', type=str, default='192.168.1.103', help='Server IP address.')
+    parser.add_argument('--port', type=str, default='8282', help='Server port.')
     args = parser.parse_args()
 
     if DNN == 'TF':
@@ -82,14 +86,19 @@ if __name__ == '__main__':
 
     ret, frame = cap.read()
     if (ret == True):
-        q = Box(10,10,200,200,156)
-       
         while True:
             frame = cv2.flip(frame, 1)
             boxes = getBoxes(net, frame)
             if len(boxes) > 0 :
                 crop = boxes[0].crop_image(frame)
-                cv2.imshow('crop', crop)
+                ret,jpeg =cv2.imencode('.jpg', crop)
+                imgdata = jpeg.tobytes()
+                
+                response = requests.post(
+                    url=f'http://{args.ip}:{args.port}',
+                    data = imgdata
+                )
+                # print(response.text)
             cv2.imshow("camera_module", frame)
             if cv2.waitKey(10) == 27:
                 exitFlag = 1
