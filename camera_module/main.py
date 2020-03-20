@@ -8,58 +8,64 @@ import requests
 import sys
 from Box import Box
 import random
+import dlib
 
 exitFlag = 0
 DNN = 'TF'
+dlib_scale = 1
 
 class ServerThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
     def run(self):
         print("Starting server comunication thread")
-        threadLock.acquire()
+        #threadLock.acquire()
         sendToServer()
         print("Exiting server communication thread")
-        threadLock.release()
+        #threadLock.release()
 
 
 def sendToServer():
-    print('Entering sendToServer')
+    #print('Entering sendToServer')
     while not exitFlag:
-        #print('yes')
         for face in faceBoxes:
             if face.label == "undefined":
-                print(face)
                 crop = face.crop_image(frame)
                 ret,jpeg =cv2.imencode('.jpg', crop)
                 imgdata = jpeg.tobytes()
-                #print(imgdata)
                 response = requests.post(
                     url=f'http://{args.ip}:{args.port}',
                     data =  imgdata,
                     headers = {"Content-Type" :"image/jpeg"}
                 )
-                print(response.text)
                 face.label = response.text
-    print('Exiting sendToServer')
-            
+        time.sleep(1)
+    #print('Exiting sendToServer')
+
 
 def getBoxes(net , frame, conf_threshold=0.7):
-    frameDnn = frame.copy()
-    frameHeight = frameDnn.shape[0]
-    frameWidth = frameDnn.shape[1]
-    blob = cv2.dnn.blobFromImage(frameDnn, 1.0, (300, 300), [104, 117, 123], True, False)
-    net.setInput(blob)
-    detections = net.forward()
     bboxes = []
-    for i in range(detections.shape[2]):
-        confidence = detections[0, 0, i, 2]
-        if confidence > conf_threshold:
-            x1 = int(detections[0, 0, i, 3] * frameWidth)
-            y1 = int(detections[0, 0, i, 4] * frameHeight)
-            x2 = int(detections[0, 0, i, 5] * frameWidth)
-            y2 = int(detections[0, 0, i, 6] * frameHeight)
-            bboxes.append([x1, y1, x2, y2])
+    if DNN == 'dlib':
+        dets = net(frame, dlib_scale)
+        for k, d in enumerate(dets):
+            # print("Detection {}: Left: {} Top: {} Right: {} Bottom: {}".format(
+            #     k, d.left(), d.top(), d.right(), d.bottom()))
+            bboxes.append([d.left(), d.top(), d.right(), d.bottom()])
+    else:
+        frameDnn = frame.copy()
+        frameHeight = frameDnn.shape[0]
+        frameWidth = frameDnn.shape[1]
+        blob = cv2.dnn.blobFromImage(frameDnn, 1.0, (300, 300), [104, 117, 123], True, False)
+        net.setInput(blob)
+        detections = net.forward()
+        for i in range(detections.shape[2]):
+            confidence = detections[0, 0, i, 2]
+            if confidence > conf_threshold:
+                x1 = int(detections[0, 0, i, 3] * frameWidth)
+                y1 = int(detections[0, 0, i, 4] * frameHeight)
+                x2 = int(detections[0, 0, i, 5] * frameWidth)
+                y2 = int(detections[0, 0, i, 6] * frameHeight)
+                bboxes.append([x1, y1, x2, y2])
     return bboxes
 
 def drawBoxes(Boxes, frame):
@@ -91,7 +97,9 @@ if __name__ == '__main__':
 
     try:
         print('[INFO] Loading model')
-        if DNN == 'TF':
+        if DNN == 'dlib':
+            net = dlib.get_frontal_face_detector()
+        elif DNN == 'TF':
             modelFile = os.path.sep.join(["face-detection_model", "opencv_face_detector_uint8.pb"])
             configFile = os.path.sep.join(["face-detection_model", "opencv_face_detector.pbtxt"])
             net = cv2.dnn.readNetFromTensorflow(modelFile, configFile)
@@ -114,7 +122,7 @@ if __name__ == '__main__':
             raise RuntimeError
     except Exception:
         sys.exit('Failed to connect to server')
-    
+
     print('[INFO] Successfully connected to server')
 
     print('[INFO] Setting up camera')
@@ -126,38 +134,26 @@ if __name__ == '__main__':
     print('[INFO] Stream started')
     random.seed(33)
     faceBoxes = []
-    threadLock = threading.Lock()
+    #threadLock = threading.Lock()
     ret, frame = cap.read()
     thread = ServerThread()
     thread.start()
     if (ret == True):
         while True:
+            t = time.time()
             frame = cv2.flip(frame, 1)
             bboxes = getBoxes(net, frame)
-            # if len(bboxes)>0:
-            #     b = Box(bboxes[0])
-            #     crop = b.crop_image(frame)
-            #     ret, jpeg = cv2.imencode('.jpg', crop)
-            #     imgdata = jpeg.tobytes()
-            #     print(imgdata)
-            #     response = requests.post(
-            #         url=f'http://{args.ip}:{args.port}',
-            #         data = "data".encode('utf-8'),
-            #         #headers = {"Content-Type" :"image/jpeg"}
-            #     )
-            #     cv2.imshow("crop", crop)
             faceBoxes = processBox(faceBoxes, bboxes)
-            #print("faces", faceBoxes)
             drawBoxes(faceBoxes, frame)
             cv2.imshow("camera_module", frame)
             if cv2.waitKey(10) == 27:
                 exitFlag = 1
-                thread.join()
                 break
             ret, frame = cap.read()
-    #FIXME opencv window not responding
-    
-    cv2.destroyAllWindows() 
+            #print("FPS: ", 1.0/(time.time() - t))
+
+    cv2.destroyAllWindows()
     cv2.VideoCapture(0).release()
-    
+    thread.join()
+
 

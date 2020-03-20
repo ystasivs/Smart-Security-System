@@ -1,19 +1,33 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
-import PIL
-from PIL import Image
-from io import BytesIO
 import urllib.parse
 import argparse
+import dlib
+import json
+import numpy as np
+import cv2
 
+def recognizeFace(im):
+    b = dlib.rectangle(0,0,im.shape[1], im.shape[0])
+    shape = sp(im, b)
+    face_descriptor = facerec.compute_face_descriptor(im, shape)
+    vector1 = np.zeros(shape=128)
+    for i in range(0, len(face_descriptor)):
+        vector1[i] = face_descriptor[i]
+    for k in face_data:
+        vec_norm = np.linalg.norm(vector1-face_data[k])
+        print(vec_norm)
+        if vec_norm < 0.6:
+            return k
+    return 'undefined'
+    
 
 class Handler(BaseHTTPRequestHandler):
     def _do_answer(self):
-        print(self.headers)
+        #print(self.headers)
         data_size = int(self.headers['Content-Length'])
         data_bytes = self.rfile.read(data_size)
         if self.headers['Content-Type'] == "text/html":
-            print('hello')
             content = "{}".format(data_bytes.decode("utf-8"))
             qs = dict( (k, v if len(v)>1 else v[0] ) 
             for k, v in urllib.parse.parse_qs(content).items())
@@ -24,11 +38,11 @@ class Handler(BaseHTTPRequestHandler):
                     return "Who are you?".encode('utf-8')
             return "".encode('utf-8')
         elif self.headers['Content-Type'] == "image/jpeg":
-            im = Image.open(BytesIO(data_bytes))
-            im.show()
-            return "stasiv".encode('utf-8')
+            array = np.frombuffer(data_bytes, dtype=np.uint8)
+            image = cv2.imdecode(array, cv2.IMREAD_COLOR)
+            return recognizeFace(image).encode('utf-8')
         else:
-            return "unknown".encode('utf-8')
+            return "unknown request".encode('utf-8')
 
     def do_POST(self):
         self.send_response(200)
@@ -63,5 +77,30 @@ if __name__ == "__main__":
         default=8282,
         help="Specify the port on which the server listens",
     )
+    parser.add_argument(
+        '-sp',
+        '--shape_predictor',
+        type=str,
+        default='shape_predictor_5_face_landmarks.dat',
+        help='Set shape predictor path')
+    parser.add_argument(
+        '-fr',
+        '--face_recognition',
+        type=str,
+        default='dlib_face_recognition_resnet_model_v1.dat',
+        help='Set face recognizer path'
+    )
+    parser.add_argument(
+        '--face_data',
+        type=str,
+        default='face_data.json',
+        help='Set face data path'
+    )
     args = parser.parse_args()
+
+    sp = dlib.shape_predictor(args.shape_predictor)
+    facerec = dlib.face_recognition_model_v1(args.face_recognition)
+    with open(args.face_data) as json_file:
+        face_data = json.load(json_file)
+        json_file.close()
     run(addr=args.listen, port=args.port)
