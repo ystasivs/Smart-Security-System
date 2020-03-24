@@ -6,6 +6,7 @@ import dlib
 import json
 import numpy as np
 import cv2
+import requests
 
 def recognizeFace(im):
     b = dlib.rectangle(0,0,im.shape[1], im.shape[0])
@@ -24,7 +25,7 @@ def recognizeFace(im):
 
 class Handler(BaseHTTPRequestHandler):
     def _do_answer(self):
-        #print(self.headers)
+        print(self.headers)
         data_size = int(self.headers['Content-Length'])
         data_bytes = self.rfile.read(data_size)
         if self.headers['Content-Type'] == "text/html":
@@ -36,11 +37,17 @@ class Handler(BaseHTTPRequestHandler):
                     return "Hello ystasiv".encode('utf-8')
                 else:
                     return "Who are you?".encode('utf-8')
-            return "".encode('utf-8')
+            return "unknown request".encode('utf-8')
         elif self.headers['Content-Type'] == "image/jpeg":
             array = np.frombuffer(data_bytes, dtype=np.uint8)
             image = cv2.imdecode(array, cv2.IMREAD_COLOR)
             return recognizeFace(image).encode('utf-8')
+        elif self.headers['Content-Type'] == "photo":
+            print('here')
+            result = requests.post(url ="https://api.telegram.org/bot1142650547:AAECZC9zQTiN26s04-EZw6cYn0GZKJN4Z5c/sendPhoto", headers={},
+            data={'chat_id': '313115335','caption': 'WARNING. Stranger detected'}, files=[('photo', data_bytes)])
+            print(result)
+            return "stranger".encode('utf-8')
         else:
             return "unknown request".encode('utf-8')
 
@@ -81,13 +88,13 @@ if __name__ == "__main__":
         '-sp',
         '--shape_predictor',
         type=str,
-        default='shape_predictor_5_face_landmarks.dat',
+        default='models/shape_predictor_5_face_landmarks.dat',
         help='Set shape predictor path')
     parser.add_argument(
         '-fr',
         '--face_recognition',
         type=str,
-        default='dlib_face_recognition_resnet_model_v1.dat',
+        default='models/dlib_face_recognition_resnet_model_v1.dat',
         help='Set face recognizer path'
     )
     parser.add_argument(

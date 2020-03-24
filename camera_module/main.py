@@ -10,6 +10,7 @@ from Box import Box
 import random
 import dlib
 
+
 exitFlag = 0
 DNN = 'TF'
 dlib_scale = 1
@@ -19,28 +20,31 @@ class ServerThread(threading.Thread):
         threading.Thread.__init__(self)
     def run(self):
         print("Starting server comunication thread")
-        #threadLock.acquire()
         sendToServer()
         print("Exiting server communication thread")
-        #threadLock.release()
 
 
 def sendToServer():
-    #print('Entering sendToServer')
     while not exitFlag:
         for face in faceBoxes:
             if face.label == "undefined":
                 crop = face.crop_image(frame)
-                ret,jpeg =cv2.imencode('.jpg', crop)
+                ret,jpeg = cv2.imencode('.jpg', crop)
                 imgdata = jpeg.tobytes()
-                response = requests.post(
-                    url=f'http://{args.ip}:{args.port}',
-                    data =  imgdata,
+                print(time.time() - face.sess_start_time)
+                if time.time() - face.sess_start_time < 8:
                     headers = {"Content-Type" :"image/jpeg"}
+                else:
+                    print('yes')
+                    headers = {"Content-Type" :"photo"}
+                response = requests.post(
+                    url = f'http://{args.ip}:{args.port}',
+                    data =  imgdata,
+                    headers = headers
                 )
                 face.label = response.text
         time.sleep(1)
-    #print('Exiting sendToServer')
+
 
 
 def getBoxes(net , frame, conf_threshold=0.7):
@@ -48,8 +52,6 @@ def getBoxes(net , frame, conf_threshold=0.7):
     if DNN == 'dlib':
         dets = net(frame, dlib_scale)
         for k, d in enumerate(dets):
-            # print("Detection {}: Left: {} Top: {} Right: {} Bottom: {}".format(
-            #     k, d.left(), d.top(), d.right(), d.bottom()))
             bboxes.append([d.left(), d.top(), d.right(), d.bottom()])
     else:
         frameDnn = frame.copy()
@@ -71,14 +73,15 @@ def getBoxes(net , frame, conf_threshold=0.7):
 def drawBoxes(Boxes, frame):
     for box in Boxes:
         box.drawBox(frame)
+        box.updateStatus = False
 
-#TODO : make better propagation
 def processBox(faceBoxes, bboxes):
     newFaceBoxes = []
     for face in faceBoxes:
         for box in bboxes:
             if face.isNextFrame(box):
                 face.updateCoords(box)
+                face.updateStatus = True
                 bboxes.remove(box)
                 newFaceBoxes.append(face)
     for box in bboxes:
@@ -91,7 +94,7 @@ if __name__ == '__main__':
     parser.add_argument('--cam_id', type=int, default=0, help='Input stream ID.')
     parser.add_argument('--width', type=int, default=640, help='Input stream width.')
     parser.add_argument('--heigth', type=int, default=480, help='Input stream heigth.')
-    parser.add_argument('--ip', type=str, default='192.168.1.103', help='Specify the IP address on which the server listens')
+    parser.add_argument('--ip', type=str, default='192.168.1.104', help='Specify the IP address on which the server listens')
     parser.add_argument('--port', type=str, default='8282', help='Specify the port on which the server listens')
     args = parser.parse_args()
 
@@ -121,7 +124,7 @@ if __name__ == '__main__':
         if response.text != "Hello ystasiv":
             raise RuntimeError
     except Exception:
-        sys.exit('Failed to connect to server')
+        sys.exit('[ERROR] Failed to connect to server')
 
     print('[INFO] Successfully connected to server')
 
@@ -134,7 +137,6 @@ if __name__ == '__main__':
     print('[INFO] Stream started')
     random.seed(33)
     faceBoxes = []
-    #threadLock = threading.Lock()
     ret, frame = cap.read()
     thread = ServerThread()
     thread.start()
@@ -155,5 +157,6 @@ if __name__ == '__main__':
     cv2.destroyAllWindows()
     cv2.VideoCapture(0).release()
     thread.join()
+    #313115335
 
 

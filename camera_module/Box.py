@@ -1,12 +1,14 @@
 import cv2
 import numpy as np
 import time
+import math
 
 class Box():
     def __init__(self, box, ID=0):
         self.x1, self.y1, self.x2, self.y2 = box
         self.id = ID
         self.label = 'undefined'
+        self.updateStatus = False
         self.sess_start_time = time.time()
     
     def drawBox(self, frame):
@@ -24,8 +26,11 @@ class Box():
     
     #FIXME write isNextFrame
     def isNextFrame(self, box):
-        a = box[0]
-        return True
+        if self.updateStatus == False:
+            thresh = math.sqrt((self.x1 - self.x2)**2 + (self.y1 - self.y2)**2) / 2
+            if math.sqrt((self.x1 - box[0])**2 + (self.y1 - box[1])**2) < thresh:
+                return True
+        return False
 
     def crop_image(self, frame):
         return frame[self.y1 : self.y2, self.x1 : self.x2] 
