@@ -11,13 +11,17 @@ import requests
 def recognizeFace(im):
     b = dlib.rectangle(0,0,im.shape[1], im.shape[0])
     shape = sp(im, b)
-    face_descriptor = facerec.compute_face_descriptor(im, shape)
+    #print(shape)
+    face_chip = dlib.get_face_chip(im, shape)
+    face_descriptor = facerec.compute_face_descriptor(face_chip)
+    #face_descriptor = facerec.compute_face_descriptor(im, shape)
     vector1 = np.zeros(shape=128)
     for i in range(0, len(face_descriptor)):
         vector1[i] = face_descriptor[i]
     for k in face_data:
         vec_norm = np.linalg.norm(vector1-face_data[k])
-        print(vec_norm)
+        print("vector diff: ", vec_norm)
+        
         if vec_norm < 0.6:
             return k
     return 'undefined'
@@ -25,7 +29,7 @@ def recognizeFace(im):
 
 class Handler(BaseHTTPRequestHandler):
     def _do_answer(self):
-        print(self.headers)
+        #print(self.headers)
         data_size = int(self.headers['Content-Length'])
         data_bytes = self.rfile.read(data_size)
         if self.headers['Content-Type'] == "text/html":
@@ -46,7 +50,6 @@ class Handler(BaseHTTPRequestHandler):
             print('here')
             result = requests.post(url ="https://api.telegram.org/bot1142650547:AAECZC9zQTiN26s04-EZw6cYn0GZKJN4Z5c/sendPhoto", headers={},
             data={'chat_id': '313115335','caption': 'WARNING. Stranger detected'}, files=[('photo', data_bytes)])
-            print(result)
             return "stranger".encode('utf-8')
         else:
             return "unknown request".encode('utf-8')

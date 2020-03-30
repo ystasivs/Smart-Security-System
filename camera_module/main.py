@@ -12,8 +12,8 @@ import dlib
 
 
 exitFlag = 0
-DNN = 'TF'
-dlib_scale = 1
+DNN = 'dlib'
+dlib_scale = 0
 
 class ServerThread(threading.Thread):
     def __init__(self):
@@ -31,11 +31,10 @@ def sendToServer():
                 crop = face.crop_image(frame)
                 ret,jpeg = cv2.imencode('.jpg', crop)
                 imgdata = jpeg.tobytes()
-                print(time.time() - face.sess_start_time)
+                #print(time.time() - face.sess_start_time)
                 if time.time() - face.sess_start_time < 8:
                     headers = {"Content-Type" :"image/jpeg"}
                 else:
-                    print('yes')
                     headers = {"Content-Type" :"photo"}
                 response = requests.post(
                     url = f'http://{args.ip}:{args.port}',
