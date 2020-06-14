@@ -9,6 +9,8 @@ import sys
 from Box import Box
 import random
 import dlib
+import subprocess as sps
+
 
 
 exitFlag = 0
@@ -113,17 +115,17 @@ if __name__ == '__main__':
         sys.exit('[ERROR] Failed to load model')
     print('[INFO] Model successfuly loaded')
 
-    try:
-        print('[INFO] Connecting to server')
-        response = requests.post(
-            url = f'http://{args.ip}:{args.port}',
-            data = {'check': 'Hello from ystasiv'},
-            headers = {"Content-Type" :"text/html"}
-        )
-        if response.text != "Hello ystasiv":
-            raise RuntimeError
-    except Exception:
-        sys.exit('[ERROR] Failed to connect to server')
+    # try:
+    #     print('[INFO] Connecting to server')
+    #     response = requests.post(
+    #         url = f'http://{args.ip}:{args.port}',
+    #         data = {'check': 'Hello from ystasiv'},
+    #         headers = {"Content-Type" :"text/html"}
+    #     )
+    #     if response.text != "Hello ystasiv":
+    #         raise RuntimeError
+    # except Exception:
+    #     sys.exit('[ERROR] Failed to connect to server')
 
     print('[INFO] Successfully connected to server')
 
@@ -133,12 +135,31 @@ if __name__ == '__main__':
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.heigth)
 
+
+    ffmpeg = 'ffmpeg'
+    dimension = '640x480'
+    f_format = 'bgr24'
+    command = [ffmpeg,
+           '-y',
+           '-f', 'rawvideo',
+           '-vcodec','rawvideo',
+           '-video_size', dimension,
+           '-pix_fmt', 'bgr24',
+           '-r', '15',
+           '-i', '-',
+           '-an',
+           '-vcodec', 'libx264',
+           '-f', 'rtp',
+           'rtp://192.151.150.42:8004' ]
+    proc = sps.Popen(command, stdin=sps.PIPE, stderr=sps.PIPE)
+
+
     print('[INFO] Stream started')
     random.seed(33)
     faceBoxes = []
     ret, frame = cap.read()
-    thread = ServerThread()
-    thread.start()
+    #thread = ServerThread()
+    #thread.start()
     if (ret == True):
         while True:
             t = time.time()
@@ -147,6 +168,7 @@ if __name__ == '__main__':
             faceBoxes = processBox(faceBoxes, bboxes)
             drawBoxes(faceBoxes, frame)
             cv2.imshow("camera_module", frame)
+            proc.stdin.write(frame.tostring())
             if cv2.waitKey(10) == 27:
                 exitFlag = 1
                 break
